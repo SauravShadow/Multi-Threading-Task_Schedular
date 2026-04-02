@@ -1,3 +1,0 @@
-/Users/saurav/Desktop/Project/Task-Scheduler/build/CMakeFiles/task_schedular.dir
-/Users/saurav/Desktop/Project/Task-Scheduler/build/CMakeFiles/edit_cache.dir
-/Users/saurav/Desktop/Project/Task-Scheduler/build/CMakeFiles/rebuild_cache.dir
