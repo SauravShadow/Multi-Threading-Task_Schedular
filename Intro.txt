@@ -1,0 +1,22 @@
+Concept:
+
+A task scheduler is basically a system that:
+- Accept tasks
+- Queues them
+- Executes them using multiple threads
+- Manages the timing, priority, and dependencies of tasks
+
+CORE Features (Starting with simple -> Scale):
+
+Version 1:
+- THread pool
+- Task Queues
+- Worker threads
+- Graceful shutdown
+
+
+High level Architecture:
+
+Task Scheduler -> Task Queue -> Worker Threads(Worker threads) -> Execute task
+
+Task Queue : (Thread-safe (mutex + condition variable))
