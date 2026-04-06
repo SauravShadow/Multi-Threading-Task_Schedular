@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C++ Multithreading Task Scheduler</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255,255,255,0.1);
+            --text-primary: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --queued: #f59e0b;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        select, input {
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            border: 1px solid var(--border-color);
+            font-family: 'Inter', sans-serif;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0px);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .column {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .column h2 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .job-card {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .job-card.running { border-left: 4px solid var(--accent); }
+        .job-card.completed { border-left: 4px solid var(--success); opacity: 0.9; }
+        .job-card.queued { border-left: 4px solid var(--queued); }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .job-id {
+            font-family: monospace;
+            font-size: 14px;
+            color: #cbd5e1;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .thread-badge {
+            font-size: 12px;
+            background: rgba(59, 130, 246, 0.2);
+            color: #93c5fd;
+            padding: 3px 8px;
+            border-radius: 12px;
+        }
+
+        .progress-bg {
+            background: rgba(255,255,255,0.1);
+            height: 8px;
+            border-radius: 4px;
+            width: 100%;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.2s linear;
+        }
+        
+        .running .progress-fill { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+        .completed .progress-fill { background: var(--success); box-shadow: 0 0 10px var(--success); }
+
+        .completed .result-box {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .instructions {
+            color: var(--text-muted);
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            margin-top: -15px;
+            margin-bottom: 30px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>C++ Multi-Threading Visualizer</h1>
+    <p class="instructions">
+        Experience real-time C++ multithreading! Enter multiple passwords separated by commas (e.g., <strong>ADMIN, SYSTEM, GUEST</strong>).<br>
+        <span style="color: #cbd5e1; font-weight: bold;">(Inputs must be strictly 1 to 8 Alphanumeric characters limitation)</span><br>
+        Adjust the Worker Threads to see how the Thread Pool schedules your tasks across the CPU dynamically based on available resources.
+    </p>
+
+    <div class="controls">
+        <div class="input-group">
+            <label>Worker Threads:</label>
+            <input type="number" id="threadCount" value="4" min="1" max="64" style="width: 60px;">
+            <button onclick="setThreads()" style="background: #eab308; padding: 10px 15px; margin-right: 20px;">🔄 Update Thread Pool Size</button>
+        </div>
+
+        <div class="input-group" style="flex-direction: column; align-items: flex-start;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label>Target Password(s):</label>
+                <input type="text" id="targetPwd" value="COOL" placeholder="e.g. ROOT, ADMIN, USER">
+            </div>
+            <div id="errorMsg" style="color: #ef4444; font-size: 13px; font-weight: 500; margin-top: 5px; margin-left: 140px; display: none;"></div>
+        </div>
+
+        <button onclick="submitTask()">➕ Execute Hack</button>
+        <button onclick="submitBurst()" style="background: #8b5cf6;">🚀 Burst Input 5x</button>
+    </div>
+
+    <div class="dashboard">
+        <div class="column" id="col-queued">
+            <h2>Queued Jobs <span id="q-count">0</span></h2>
+            <div id="queued-list"></div>
+        </div>
+        
+        <div class="column" id="col-running">
+            <h2>Active Worker Threads <span id="r-count">0</span></h2>
+            <div id="running-list"></div>
+        </div>
+
+        <div class="column" id="col-completed">
+            <h2>Completed Results <span id="c-count">0</span></h2>
+            <div id="completed-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8081";
+
+        async function setThreads() {
+            const count = document.getElementById("threadCount").value;
+            try {
+                const fd = new URLSearchParams();
+                fd.append("count", count);
+                await fetch(`${API_URL}/api/set_threads`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: fd 
+                });
+            } catch (err) {
+                console.error("Failed to set threads", err);
+            }
+        }
+
+        function showError(msg) {
+            const errDiv = document.getElementById("errorMsg");
+            if (msg) {
+                errDiv.innerText = msg;
+                errDiv.style.display = "block";
+            } else {
+                errDiv.style.display = "none";
+            }
+        }
+
+        async function submitTask(targetOverride = null) {
+            let pwdInput = targetOverride || document.getElementById("targetPwd").value;
+            const targets = pwdInput.split(",").map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+
+            if (targets.length === 0) {
+                showError("Please enter at least one target password.");
+                return;
+            }
+
+            // Validation step
+            const regex = /^[A-Z0-9]{1,8}$/;
+            for (const targetPwd of targets) {
+                if (!regex.test(targetPwd)) {
+                    showError(`❌ Invalid input '${targetPwd}'. Must be 1 to 8 alphanumeric characters!`);
+                    return; // abort whole submission
+                }
+            }
+
+            showError(null); // Clear errors upon success!
+
+            for (const targetPwd of targets) {
+                try {
+                    const fd = new URLSearchParams();
+                    fd.append("target_password", targetPwd);
+                    await fetch(`${API_URL}/api/submit`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: fd 
+                    });
+                } catch (err) {
+                    console.error("Failed to submit task", err);
+                }
+                // tiny stagger so UI animations look super clean
+                await new Promise(r => setTimeout(r, 50));
+            }
+        }
+
+        async function submitBurst() {
+            let pwdInput = document.getElementById("targetPwd").value;
+            if (!pwdInput || pwdInput.trim() === "") return;
+            
+            // Submits everything inside the input field 5 times!
+            const burstArray = Array(5).fill(pwdInput).join(", ");
+            submitTask(burstArray);
+        }
+
+        function createJobCard(job) {
+            const el = document.createElement('div');
+            el.className = `job-card ${job.status.toLowerCase()}`;
+            el.id = `job-${job.id}`;
+            
+            el.innerHTML = `
+                <div class="job-header">
+                    <span class="job-id">#${job.id}</span>
+                    <span class="thread-badge-container"></span>
+                </div>
+                <div class="job-type" style="font-size: 14px; font-weight: 500; margin-bottom: 4px;"></div>
+                <div class="result-container"></div>
+                <div class="progress-bg">
+                    <div class="progress-fill" style="width: 0%"></div>
+                </div>
+            `;
+            updateJobCard(el, job);
+            return el;
+        }
+
+        function updateJobCard(el, job) {
+            el.className = `job-card ${job.status.toLowerCase()}`;
+            
+            const badgeContainer = el.querySelector('.thread-badge-container');
+            let threadInfo = job.thread_id ? `<span class="thread-badge">Thread 0x${job.thread_id}</span>` : '';
+            if (job.status === "Queued") threadInfo = `<span class="thread-badge" style="background:#555; color:#ccc;">Waiting...</span>`;
+            if(badgeContainer.innerHTML !== threadInfo) badgeContainer.innerHTML = threadInfo;
+
+            const typeEl = el.querySelector('.job-type');
+            if(typeEl.innerText !== job.type) typeEl.innerText = job.type;
+
+            const resContainer = el.querySelector('.result-container');
+            let resultHtml = "";
+            if (job.result) {
+                resultHtml = `<div class="result-box">💡 ${job.result}</div>`;
+            }
+            if(resContainer.innerHTML !== resultHtml) resContainer.innerHTML = resultHtml;
+
+            const progFill = el.querySelector('.progress-fill');
+            progFill.style.width = `${job.progress}%`;
+        }
+
+        function startStream() {
+            console.log("Connecting to SSE...");
+            const evtSource = new EventSource(`${API_URL}/api/stream`);
+            
+            evtSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                const queuedList = document.getElementById('queued-list');
+                const runningList = document.getElementById('running-list');
+                const completedList = document.getElementById('completed-list');
+
+                let qCount = 0, rCount = 0, cCount = 0;
+                const reversedData = [...data].reverse();
+                
+                // Track IDs dynamically to remove orphaned (cleared) jobs
+                const activeJobIds = new Set(reversedData.map(j => j.id));
+
+                reversedData.forEach(job => {
+                    let card = document.getElementById(`job-${job.id}`);
+                    
+                    // DOM Updates Without Thrashing!
+                    if (!card) {
+                        card = createJobCard(job);
+                    } else {
+                        updateJobCard(card, job);
+                    }
+
+                    // Physically Reparent Column changes ONLY if the column actually changed!
+                    if (job.status === "Queued") {
+                        if (card.parentElement !== queuedList) queuedList.appendChild(card);
+                        qCount++;
+                    } else if (job.status === "Running") {
+                        if (card.parentElement !== runningList) runningList.prepend(card);
+                        rCount++;
+                    } else if (job.status === "Completed") {
+                        if (card.parentElement !== completedList) completedList.appendChild(card);
+                        cCount++;
+                    }
+                });
+
+                // Delete node entirely if backend tracker no longer has it (Thread Count Restarted)
+                document.querySelectorAll('.job-card').forEach(el => {
+                    const id = el.id.replace('job-', '');
+                    if (!activeJobIds.has(id)) el.remove();
+                });
+
+                document.getElementById('q-count').innerText = qCount;
+                document.getElementById('r-count').innerText = rCount;
+                document.getElementById('c-count').innerText = cCount;
+            };
+
+            evtSource.onerror = function() {
+                console.error("SSE Connection lost. Retrying...");
+                evtSource.close();
+                setTimeout(startStream, 2000);
+            };
+        }
+
+        startStream();
+    </script>
+</body>
+</html>

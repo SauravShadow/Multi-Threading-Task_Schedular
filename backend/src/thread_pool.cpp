@@ -41,7 +41,9 @@ void ThreadPool::shutdown() {
 
   // Wait for all threads to finish
   for (auto &worker : workers_) {
-    worker.join();
+    if (worker.joinable()) {
+      worker.join();
+    }
   }
 }
 

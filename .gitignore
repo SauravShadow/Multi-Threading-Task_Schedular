@@ -43,3 +43,4 @@ bin/
 CMakeUserPresets.json
 CMakeCache.txt
 CMakeFiles/
+.DS_Store

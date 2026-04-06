@@ -13,7 +13,7 @@
 // Task Wrapper
 struct ScheduledTask {
   std::chrono::steady_clock::time_point execute_at;
-  std::function<void> func;
+  std::function<void()> func;
 
   bool operator>(const ScheduledTask &other) const {
     return execute_at > other.execute_at;
@@ -46,3 +46,39 @@ public:
 
   void shutdown();
 };
+
+template <typename F>
+auto TaskScheduler::submit(F &&f) -> std::future<decltype(f())> {
+  using ReturnType = decltype(f());
+
+  auto task_ptr =
+      std::make_shared<std::packaged_task<ReturnType()>>(std::forward<F>(f));
+
+  std::future<ReturnType> future = task_ptr->get_future();
+
+  ready_queue.push([task_ptr]() { (*task_ptr)(); });
+
+  return future;
+}
+
+template <typename F>
+auto TaskScheduler::schedule_after(F &&f, std::chrono::milliseconds delay)
+    -> std::future<decltype(f())> {
+  using ReturnType = decltype(f());
+
+  auto task_ptr =
+      std::make_shared<std::packaged_task<ReturnType()>>(std::forward<F>(f));
+
+  std::future<ReturnType> future = task_ptr->get_future();
+
+  ScheduledTask task;
+  task.execute_at = std::chrono::steady_clock::now() + delay;
+  task.func = [task_ptr]() { (*task_ptr)(); };
+
+  {
+    std::lock_guard<std::mutex> lock(delay_mtx_);
+    delay_queue.push(std::move(task));
+  }
+
+  return future;
+}
