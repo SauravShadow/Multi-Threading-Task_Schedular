@@ -48,11 +48,12 @@ When heavy tasks (like brute-forcing passwords) enter the Scheduler, the API gua
 ## 🚀 Getting Started
 
 ### Prerequisites
-- macOS / Linux environment
+The entire codebase is **100% Platform Agnostic**. All threading components utilize standard C++ headers (`<thread>`, `<mutex>`), ensuring native compilation across all major operating systems.
+- macOS / Linux / **Windows** environment
 - **CMake** `v3.14+`
-- **C++23** capable compiler (Apple Clang / GCC13)
+- **C++23** capable compiler (Apple Clang / GCC13+ / MSVC)
 
-### Build & Run
+### Build & Run (macOS / Linux)
 ```bash
 # 1. Clone the repository
 git clone https://github.com/SauravShadow/Multi-Threading-Task_Schedular.git
@@ -66,6 +67,23 @@ cmake --build .
 # 3. Start the Server
 ./task_schedular
 ```
+
+### Build & Run (Windows)
+```cmd
+:: 1. Clone & Enter Directory
+git clone https://github.com/SauravShadow/Multi-Threading-Task_Schedular.git
+cd Multi-Threading-Task_Schedular
+
+:: 2. Build with MSVC (Visual Studio) or MinGW
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
+
+:: 3. Start the Server
+Release\task_schedular.exe
+```
+
 **Access the Web Visualizer** by visiting: [http://localhost:8081](http://localhost:8081) in your browser!
 
 ---
