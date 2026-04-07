@@ -36,11 +36,18 @@ std::string generate_random_string(int length) {
 // An interactive visual Brute Force simulation taking exactly 3.5 seconds
 void execute_real_task(std::string job_id, std::string target_pwd) {
     std::string t_id = get_thread_id();
+
+    // Check if already cancelled before even starting
+    if (global_job_tracker.is_cancelled(job_id)) return;
+
     global_job_tracker.update_job(job_id, "Running", 1, t_id, "Initializing Dictionary Attack...");
     std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Initial warmup delay
     
     // Simulate 100 chunks of hashes
     for (int percent = 1; percent <= 100; ++percent) {
+        // Cooperative cancellation check each iteration
+        if (global_job_tracker.is_cancelled(job_id)) return;
+
         std::string current_attempt = generate_random_string(target_pwd.length());
         std::string intermediate = "Testing Hash: " + current_attempt + " (" + std::to_string(percent) + "%)";
         global_job_tracker.update_job(job_id, "Running", percent, t_id, intermediate);
@@ -49,7 +56,8 @@ void execute_real_task(std::string job_id, std::string target_pwd) {
         std::this_thread::sleep_for(std::chrono::milliseconds(35));
     }
 
-    std::string result_str = "🔥 Hacked! Password is '" + target_pwd + "'";
+    if (global_job_tracker.is_cancelled(job_id)) return;
+    std::string result_str = "Hacked! Password is '" + target_pwd + "'";
     std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Final pause so running text settles
     global_job_tracker.update_job(job_id, "Completed", 100, t_id, result_str);
 }
@@ -64,7 +72,21 @@ int main() {
     httplib::Server svr;
 
     // Serve Static UI Files (our frontend!)
-    svr.set_mount_point("/", "./frontend/public");
+    auto base_dir = std::filesystem::current_path().string();
+    std::string public_dir = base_dir + "/frontend/public";
+    svr.set_mount_point("/", public_dir);
+    
+    // Explicitly handle the root to serve index.html
+    svr.Get("/", [public_dir](const httplib::Request& req, httplib::Response& res) {
+        std::ifstream file(public_dir + "/index.html");
+        if (file) {
+            std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            res.set_content(content, "text/html");
+        } else {
+            res.status = 404;
+            res.set_content("UI File Not Found", "text/plain");
+        }
+    });
 
     // Dynamic thread count endpoint
     svr.Post("/api/set_threads", [&](const httplib::Request& req, httplib::Response& res) {
@@ -103,17 +125,50 @@ int main() {
         res.set_header("Access-Control-Allow-Origin", "*");
     });
 
+    // Cancel a single job by ID
+    svr.Post("/api/cancel", [&](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        if (req.has_param("job_id")) {
+            std::string job_id = req.get_param_value("job_id");
+            bool ok = global_job_tracker.cancel_job(job_id);
+            json resp = {{"status", ok ? "cancelled" : "not_found"}, {"job_id", job_id}};
+            res.set_content(resp.dump(), "application/json");
+        } else {
+            res.status = 400;
+            res.set_content("{\"error\":\"job_id param required\"}", "application/json");
+        }
+    });
+
+    // Cancel ALL queued and running jobs
+    svr.Post("/api/cancel_all", [&](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        global_job_tracker.clear();
+        json resp = {{"status", "all_cleared"}};
+        res.set_content(resp.dump(), "application/json");
+    });
+
     svr.Get("/api/stream", [&](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Cache-Control", "no-cache");
+        res.set_header("X-Accel-Buffering", "no"); // Disable Nginx/proxy buffering
         res.set_chunked_content_provider("text/event-stream",
             [&](size_t offset, httplib::DataSink &sink) {
+                int tick = 0;
                 while (server_running) {
+                    // Every 30 seconds send an SSE comment as a keep-alive heartbeat
+                    // This prevents Cloudflare's 100-second proxy timeout from killing the stream
+                    if (tick % 120 == 0 && tick > 0) {
+                        std::string ping = ": ping\n\n";
+                        if (!sink.write(ping.data(), ping.size())) return false;
+                    }
+
                     json data = global_job_tracker.get_all_jobs();
                     std::string event = "data: " + data.dump() + "\n\n";
                     if (!sink.write(event.data(), event.size())) {
                         return false; // Connection closed by client
                     }
                     std::this_thread::sleep_for(std::chrono::milliseconds(250)); // 4 frames per second
+                    tick++;
                 }
                 return true;
             }

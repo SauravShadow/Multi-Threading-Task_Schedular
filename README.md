@@ -25,6 +25,12 @@ The overarching architecture bridges a modern interactive frontend with a highly
 
 The engine uses **`cpp-httplib`** to spawn a multi-threaded listener capable of handling concurrent REST API invocations (`/api/submit`). When jobs are posted, they completely bypass main-thread HTTP bottlenecks by dispatching straight into the C++ `TaskScheduler`. A unidirectional HTTP stream is opened at `/api/stream` where native HTML5 `EventSource` protocols observe real-time job execution states.
 
+### 🌐 Deployment Architecture & Continuous Deployment Pipeline
+The application runs autonomously in production using a custom automated local-edge architecture:
+- **Zero-Downtime Daemon:** The backend is deployed as a Windows Scheduled background task driven by a custom PowerShell `keep-alive` loop. This script runs invisibly in the system background and provides self-healing auto-respawning recovery—if the executable crashes, or if a developer dynamically recompiles a new `.exe`, the pipeline automatically restarts the engine within 5 seconds.
+- **Edge Routing Strategy:** A persistent **Cloudflare Tunnel** (`cloudflared` daemon) runs system-wide to route exterior traffic from `https://task.saurav-info.xyz` securely into `localhost:8081`. This safely bypasses NAT barriers without exposing any open router ports.
+- **Unified Domain Ecosystem:** The Task Scheduler acts as a logically separated local microservice alongside the developer's Static Portfolio (`8080`) and Python REST APIs (`5000`), all managed together under a single zero-trust ingress tunnel network.
+
 ## ⚙️ Low Level Design (LLD)
 
 Beneath the HTTP handler, execution is fully asynchronous. 

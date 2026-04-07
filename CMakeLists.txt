@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.14)
 project(TaskScheduler)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# MSVC (Visual Studio 2019) needs explicit /std:c++20 flag
+if(MSVC)
+  add_compile_options(/std:c++20 /Zc:__cplusplus)
+endif()
 
 include(FetchContent)
 

@@ -28,6 +28,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            box-sizing: border-box;
         }
 
         h1 {
@@ -96,6 +97,34 @@
             width: 100%;
             max-width: 1200px;
         }
+
+        /* Mobile tab switcher — hidden on desktop */
+        .mobile-tabs {
+            display: none;
+            width: 100%;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 6px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .tab-btn.active {
+            border-color: var(--accent);
+            color: var(--text-primary);
+            background: rgba(59,130,246,0.15);
+        }
+        .tab-btn:hover { transform: none; }
 
         .column {
             background: var(--panel-bg);
@@ -174,6 +203,26 @@
         
         .running .progress-fill { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
         .completed .progress-fill { background: var(--success); box-shadow: 0 0 10px var(--success); }
+        .cancelled { border-left: 4px solid #ef4444 !important; opacity: 0.6; }
+        .cancelled .progress-fill { background: #ef4444; }
+
+        .cancel-btn {
+            background: transparent;
+            color: #ef4444;
+            border: 1px solid rgba(239,68,68,0.4);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.15s;
+        }
+        .cancel-btn:hover {
+            background: rgba(239,68,68,0.15);
+            border-color: #ef4444;
+            transform: none;
+        }
 
         .completed .result-box {
             animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
@@ -194,6 +243,75 @@
             margin-top: -15px;
             margin-bottom: 30px;
             font-size: 15px;
+            padding: 0 10px;
+        }
+
+        /* ============================================================
+           RESPONSIVE — MOBILE
+           ============================================================ */
+        @media (max-width: 768px) {
+            body { padding: 16px; }
+
+            h1 { font-size: 1.4rem; margin-bottom: 16px; }
+
+            .instructions { font-size: 13px; margin-bottom: 20px; }
+
+            .controls {
+                padding: 16px;
+                gap: 12px;
+                flex-direction: column;
+                align-items: stretch;
+                margin-bottom: 24px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .input-group {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .input-group label { font-size: 13px; white-space: nowrap; }
+
+            input[type="text"], input[type="number"] {
+                width: 100%;
+                box-sizing: border-box;
+                font-size: 14px;
+            }
+
+            input[type="number"] { width: 60px !important; }
+
+            button {
+                width: 100%;
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            /* Mobile tab switcher visible */
+            .mobile-tabs { display: flex; }
+
+            /* Dashboard becomes single column; JS controls visibility */
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .column {
+                min-height: 200px;
+                display: none;  /* JS toggles which one is visible */
+            }
+            .column.active-tab { display: flex; }
+
+            /* explanation grid single-col on mobile */
+            .explanation-container { grid-template-columns: 1fr; }
+
+            .explanation-header { font-size: 18px; }
+
+            #errorMsg { margin-left: 0 !important; }
+        }
+
+        @media (max-width: 480px) {
+            h1 { font-size: 1.2rem; }
         }
 
         /* Documentation Section Styles */
@@ -334,10 +452,18 @@
 
         <button onclick="submitTask()">➕ Execute Hack</button>
         <button onclick="submitBurst()" style="background: #8b5cf6;">🚀 Burst Input 5x</button>
+        <button onclick="cancelAll()" style="background: #dc2626;">🛑 Cancel All</button>
+    </div>
+
+    <!-- Mobile tab navigation -->
+    <div class="mobile-tabs" id="mobile-tabs">
+        <button class="tab-btn active" onclick="showTab('queued')" id="tab-queued">📋 Queued<br><span id="tab-q-count" style="font-size:11px;opacity:0.7;">0</span></button>
+        <button class="tab-btn" onclick="showTab('running')" id="tab-running">⚡ Active<br><span id="tab-r-count" style="font-size:11px;opacity:0.7;">0</span></button>
+        <button class="tab-btn" onclick="showTab('completed')" id="tab-completed">✅ Done<br><span id="tab-c-count" style="font-size:11px;opacity:0.7;">0</span></button>
     </div>
 
     <div class="dashboard">
-        <div class="column" id="col-queued">
+        <div class="column active-tab" id="col-queued">
             <h2>Queued Jobs <span id="q-count">0</span></h2>
             <div id="queued-list"></div>
         </div>
@@ -363,6 +489,8 @@
                 <p>The overarching architecture bridges a modern interactive Javascript frontend with a highly concurrent C++ backend.</p>
                 <h4>Implementation Details:</h4>
                 <p>The web server utilizes the <code>cpp-httplib</code> library to spawn a multi-threaded listener capable of handling concurrent REST invocations. When the frontend submits jobs to <code>/api/submit</code>, they bypass HTTP bottlenecks and are pushed instantly into an internal Task Scheduler. The user interface maintains a live, unidirectional connection reading from <code>/api/stream</code> using standard HTML5 Event Sources to observe execution states.</p>
+                <h4>Deployment Pipeline:</h4>
+                <p>This backend engine is deployed as a resilient, Zero-Downtime Windows Scheduled background task driven by a custom <code>keep-alive</code> script. It seamlessly auto-recovers from crashes and recompilations. External traffic is routed securely via a <strong>Cloudflare Zero-Trust Tunnel</strong> directly from <code>task.saurav-info.xyz</code> into the internal daemon on port <code>8081</code>, safely bypassing NAT rules while joining a unified microservices network along with the developer's Web Portfolio.</p>
             </div>
         </details>
 
@@ -414,7 +542,8 @@
     </div>
 
     <script>
-        const API_URL = "http://localhost:8081";
+        // Fix: Use empty string because we are running on a subdomain now!
+        const API_URL = "";
 
         async function setThreads() {
             const count = document.getElementById("threadCount").value;
@@ -478,6 +607,24 @@
             }
         }
 
+        async function cancelJob(jobId) {
+            try {
+                const fd = new URLSearchParams();
+                fd.append('job_id', jobId);
+                await fetch(`${API_URL}/api/cancel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: fd
+                });
+            } catch (err) { console.error('Cancel failed', err); }
+        }
+
+        async function cancelAll() {
+            try {
+                await fetch(`${API_URL}/api/cancel_all`, { method: 'POST' });
+            } catch (err) { console.error('Cancel all failed', err); }
+        }
+
         async function submitBurst() {
             let pwdInput = document.getElementById("targetPwd").value;
             if (!pwdInput || pwdInput.trim() === "") return;
@@ -495,7 +642,10 @@
             el.innerHTML = `
                 <div class="job-header">
                     <span class="job-id">#${job.id}</span>
-                    <span class="thread-badge-container"></span>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <span class="thread-badge-container"></span>
+                        <button class="cancel-btn" onclick="cancelJob('${job.id}')" title="Cancel this job">✕</button>
+                    </div>
                 </div>
                 <div class="job-type" style="font-size: 14px; font-weight: 500; margin-bottom: 4px;"></div>
                 <div class="result-container"></div>
@@ -518,6 +668,12 @@
             const typeEl = el.querySelector('.job-type');
             if(typeEl.innerText !== job.type) typeEl.innerText = job.type;
 
+            // Hide cancel button for completed/cancelled jobs
+            const cancelBtn = el.querySelector('.cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.style.display = (job.status === 'Completed' || job.status === 'Cancelled') ? 'none' : 'inline-block';
+            }
+
             const resContainer = el.querySelector('.result-container');
             let resultHtml = "";
             if (job.result) {
@@ -527,6 +683,18 @@
 
             const progFill = el.querySelector('.progress-fill');
             progFill.style.width = `${job.progress}%`;
+        }
+
+        // ── Mobile tab switching ──────────────────────────────────────
+        let activeTabId = 'queued';
+        function showTab(tabName) {
+            activeTabId = tabName;
+            const cols = { queued: 'col-queued', running: 'col-running', completed: 'col-completed' };
+            const tabs = { queued: 'tab-queued', running: 'tab-running', completed: 'tab-completed' };
+            Object.entries(cols).forEach(([key, colId]) => {
+                document.getElementById(colId).classList.toggle('active-tab', key === tabName);
+                document.getElementById(tabs[key]).classList.toggle('active', key === tabName);
+            });
         }
 
         function startStream() {
@@ -563,7 +731,7 @@
                     } else if (job.status === "Running") {
                         if (card.parentElement !== runningList) runningList.prepend(card);
                         rCount++;
-                    } else if (job.status === "Completed") {
+                    } else if (job.status === "Completed" || job.status === "Cancelled") {
                         if (card.parentElement !== completedList) completedList.appendChild(card);
                         cCount++;
                     }
@@ -578,6 +746,16 @@
                 document.getElementById('q-count').innerText = qCount;
                 document.getElementById('r-count').innerText = rCount;
                 document.getElementById('c-count').innerText = cCount;
+
+                // Sync mobile tab badge counts
+                document.getElementById('tab-q-count').innerText = qCount;
+                document.getElementById('tab-r-count').innerText = rCount;
+                document.getElementById('tab-c-count').innerText = cCount;
+
+                // Auto-switch to Running tab on mobile when a job becomes active
+                if (window.innerWidth <= 768 && rCount > 0 && activeTabId === 'queued') {
+                    showTab('running');
+                }
             };
 
             evtSource.onerror = function() {

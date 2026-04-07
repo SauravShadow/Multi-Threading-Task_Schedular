@@ -4,8 +4,6 @@
 #include <optional>
 #include <queue>
 
-using namespace std;
-
 // BlockingQueue<T> is a thread safe producer-consumer queue
 // Producer -> push()
 // Consumer -> wait_and_pop()
@@ -37,7 +35,7 @@ public:
   }
 
   // Wait and pop (blocking)
-  optional<T> wait_and_pop() {
+  std::optional<T> wait_and_pop() {
     std::unique_lock<std::mutex> lock(mutex_);
 
     cv_.wait(lock, [this] { return !queue_.empty() || shutdown_; });
