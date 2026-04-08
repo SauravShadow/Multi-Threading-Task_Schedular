@@ -16,6 +16,9 @@ jobs:
       - name: Rebuild and restart Task Scheduler container
         shell: powershell
         run: |
+          # Add Docker and Git to PATH (runner child process uses system PATH, not user PATH)
+          $env:PATH = "C:\Program Files\Docker\Docker\resources\bin;C:\Program Files\Git\cmd;$env:PATH"
+
           Set-Location C:\Users\HP\Desktop\HostedProjects\MultiThreadingTaskSchedular
 
           # Sync working directory with latest commit
