@@ -1,0 +1,10 @@
+.git
+build/
+UMLDiagram/
+*.bat
+*.ps1
+*.xml
+*.log
+README.md
+Intro.txt
+run.sh

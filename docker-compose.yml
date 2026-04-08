@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  taskscheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: taskscheduler:latest
+    container_name: taskscheduler
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
