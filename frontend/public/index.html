@@ -250,7 +250,11 @@
            RESPONSIVE — MOBILE
            ============================================================ */
         @media (max-width: 768px) {
-            body { padding: 16px; }
+            body {
+                padding: 16px;
+                overflow-x: hidden;
+                align-items: stretch;
+            }
 
             h1 { font-size: 1.4rem; margin-bottom: 16px; }
 
@@ -303,9 +307,26 @@
             .column.active-tab { display: flex; }
 
             /* explanation grid single-col on mobile */
-            .explanation-container { grid-template-columns: 1fr; }
+            .explanation-container {
+                grid-template-columns: 1fr;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 0;
+                margin: 0 auto 30px auto;
+            }
 
-            .explanation-header { font-size: 18px; }
+            .explanation-header {
+                font-size: 18px;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 0 0 10px 0;
+                margin: 30px auto 16px auto;
+            }
+
+            .concept-card summary h3 {
+                font-size: 14px;
+                flex-wrap: wrap;
+            }
 
             #errorMsg { margin-left: 0 !important; }
         }
@@ -317,6 +338,8 @@
         /* Documentation Section Styles */
         .explanation-header {
             max-width: 1200px;
+            width: 100%;
+            box-sizing: border-box;
             margin: 60px auto 20px auto;
             text-align: left;
             font-size: 24px;
@@ -328,6 +351,8 @@
 
         .explanation-container {
             max-width: 1200px;
+            width: 100%;
+            box-sizing: border-box;
             margin: 0 auto 50px auto;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
