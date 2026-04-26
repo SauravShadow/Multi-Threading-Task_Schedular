@@ -13,30 +13,22 @@ jobs:
       - name: Checkout latest code
         uses: actions/checkout@v4
 
-      - name: Rebuild and restart Task Scheduler container
-        shell: powershell
+      - name: Update and Deploy Task Scheduler
         run: |
-          # Add Docker and Git to PATH (runner child process uses system PATH, not user PATH)
-          $env:PATH = "C:\Program Files\Docker\Docker\resources\bin;C:\Program Files\Git\cmd;$env:PATH"
-
-          Set-Location C:\Users\HP\Desktop\HostedProjects\MultiThreadingTaskSchedular
-
-          # Sync working directory with latest commit
-          git fetch --all
+          cd /home/subaru/projects/Task-Schedular/Multi-Threading-Task_Schedular
+          git fetch origin
           git reset --hard origin/main
-
-          # Rebuild the Docker image (compiles C++ inside Docker) and restart container
-          docker compose up -d --build taskscheduler
-
-          # Clean up old dangling image layers to save disk space
-          docker image prune -f
+          sg docker -c "docker build -t taskscheduler:latest ."
+          sg docker -c "docker stop taskscheduler || true"
+          sg docker -c "docker rm taskscheduler || true"
+          sg docker -c "docker run -d --name taskscheduler -p 8081:8081 taskscheduler:latest"
+          sg docker -c "docker image prune -a -f --filter 'until=24h'"
 
       - name: Verify container is running
-        shell: powershell
         run: |
-          $status = docker inspect --format="{{.State.Status}}" taskscheduler
-          if ($status -ne "running") {
-            Write-Error "TaskScheduler container is NOT running. Status: $status"
+          status=$(docker inspect --format="{{.State.Status}}" taskscheduler)
+          if [ "$status" != "running" ]; then
+            echo "TaskScheduler container is NOT running. Status: $status"
             exit 1
-          }
-          Write-Host "TaskScheduler container is running successfully."
+          fi
+          echo "TaskScheduler container is running successfully."
