@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <functional>
 #include <future>
 #include <mutex>
@@ -27,6 +28,7 @@ private:
       delay_queue;
 
   std::mutex delay_mtx_;
+  std::condition_variable timer_cv_; // Wakes the timer thread on new/earlier tasks or shutdown
   std::thread timer_thread_;
   std::atomic<bool> stop_;
 
@@ -79,6 +81,7 @@ auto TaskScheduler::schedule_after(F &&f, std::chrono::milliseconds delay)
     std::lock_guard<std::mutex> lock(delay_mtx_);
     delay_queue.push(std::move(task));
   }
+  timer_cv_.notify_one(); // Wake the timer in case this task is due sooner than the current sleep
 
   return future;
 }

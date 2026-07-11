@@ -6,14 +6,28 @@
 #include <sstream>
 #include <string>
 #include <atomic>
-#include <cstdlib>
 #include <memory>
+#include <mutex>
+#include <random>
+#include <filesystem>
+#include <fstream>
 
 using json = nlohmann::json;
 
 JobTracker global_job_tracker;
-std::unique_ptr<TaskScheduler> global_scheduler;
+
+// global_scheduler is swapped at runtime by /api/set_threads while other request
+// threads are calling into it. A shared_ptr guarded by a mutex lets in-flight
+// callers keep the old instance alive until they finish, avoiding a use-after-free.
+std::shared_ptr<TaskScheduler> global_scheduler;
+std::mutex scheduler_mtx;
 std::atomic<bool> server_running{true};
+
+// Grab a stable reference to the current scheduler for the duration of a call.
+std::shared_ptr<TaskScheduler> get_scheduler() {
+    std::lock_guard<std::mutex> lock(scheduler_mtx);
+    return global_scheduler;
+}
 
 // Grab a shorter representation of the Thread ID
 std::string get_thread_id() {
@@ -22,13 +36,17 @@ std::string get_thread_id() {
     return ss.str().substr(ss.str().length() - 4); 
 }
 
-// Generate a random alpha-numeric string
+// Generate a random alpha-numeric string.
+// Uses a thread_local RNG so concurrent worker threads never share generator state
+// (rand() is not guaranteed thread-safe by POSIX).
 std::string generate_random_string(int length) {
     static const char alphanum[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local std::mt19937 rng(std::random_device{}());
+    thread_local std::uniform_int_distribution<int> dist(0, sizeof(alphanum) - 2);
     std::string tmp_s;
     tmp_s.reserve(length);
     for (int i = 0; i < length; ++i) {
-        tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+        tmp_s += alphanum[dist(rng)];
     }
     return tmp_s;
 }
@@ -63,10 +81,8 @@ void execute_real_task(std::string job_id, std::string target_pwd) {
 }
 
 int main() {
-    srand(static_cast<unsigned int>(time(NULL)));
-
     // 1. Initialize our existing task scheduler
-    global_scheduler = std::make_unique<TaskScheduler>(4);
+    global_scheduler = std::make_shared<TaskScheduler>(4);
     
     // 2. Initialize the Web Server
     httplib::Server svr;
@@ -90,16 +106,31 @@ int main() {
 
     // Dynamic thread count endpoint
     svr.Post("/api/set_threads", [&](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*");
         if (req.has_param("count")) {
-            int new_count = std::stoi(req.get_param_value("count"));
+            int new_count = 0;
+            try {
+                new_count = std::stoi(req.get_param_value("count"));
+            } catch (const std::exception&) {
+                res.status = 400;
+                res.set_content("{\"error\":\"count must be an integer\"}", "application/json");
+                return;
+            }
             if (new_count > 0 && new_count <= 64) {
-                global_scheduler->shutdown(); // Safely close existing threads
-                global_job_tracker.clear();   // Clear the UI
-                global_scheduler = std::make_unique<TaskScheduler>(new_count); // Re-launch
+                std::shared_ptr<TaskScheduler> old;
+                {
+                    std::lock_guard<std::mutex> lock(scheduler_mtx);
+                    old = std::move(global_scheduler);
+                    global_scheduler = std::make_shared<TaskScheduler>(new_count);
+                }
+                // Clear first so any in-flight workers of the old scheduler see the
+                // cancellation and exit quickly, then drop our reference to it. The
+                // old instance is destroyed once no request thread still holds it.
+                global_job_tracker.clear();
+                old.reset();
             }
         }
         res.set_content("{\"status\":\"ok\"}", "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
     });
 
     svr.Post("/api/submit", [&](const httplib::Request& req, httplib::Response& res) {
@@ -115,8 +146,9 @@ int main() {
 
         global_job_tracker.add_job(job_id, "Password Cracking");
 
-        // Submitting to the Thread Pool!
-        global_scheduler->submit([job_id, target_pwd]() {
+        // Submitting to the Thread Pool! Take a stable reference in case a
+        // /api/set_threads resize is swapping the scheduler concurrently.
+        get_scheduler()->submit([job_id, target_pwd]() {
             execute_real_task(job_id, target_pwd);
         });
 

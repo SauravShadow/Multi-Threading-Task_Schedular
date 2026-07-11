@@ -1,6 +1,5 @@
 #pragma once
 #include "../include/blocking_queue.h"
-#include <atomic>
 #include <functional>
 #include <thread>
 #include <vector>
@@ -11,7 +10,6 @@ class ThreadPool {
 private:
   std::vector<std::thread> workers_;
   BlockingQueue<Task> &queue_;
-  std::atomic<bool> stop_;
 
   void worker_loop();
 

@@ -1,6 +1,6 @@
 # 🚀 C++ Multi-Threading Task Scheduler & Visualizer
 
-![C++](https://img.shields.io/badge/C++-23-blue.svg?style=flat&logo=c%2B%2B)
+![C++](https://img.shields.io/badge/C++-20-blue.svg?style=flat&logo=c%2B%2B)
 ![CMake](https://img.shields.io/badge/CMake-3.14+-red.svg?style=flat&logo=cmake)
 ![SSE](https://img.shields.io/badge/Architecture-Server%20Sent%20Events-8b5cf6.svg?style=flat)
 ![Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg?style=flat)
@@ -57,7 +57,7 @@ When heavy tasks (like brute-forcing passwords) enter the Scheduler, the API gua
 The entire codebase is **100% Platform Agnostic**. All threading components utilize standard C++ headers (`<thread>`, `<mutex>`), ensuring native compilation across all major operating systems.
 - macOS / Linux / **Windows** environment
 - **CMake** `v3.14+`
-- **C++23** capable compiler (Apple Clang / GCC13+ / MSVC)
+- **C++20** capable compiler (Apple Clang / GCC13+ / MSVC)
 
 ### Build & Run (macOS / Linux)
 ```bash
@@ -95,7 +95,7 @@ Release\task_schedular.exe
 ---
 
 ## 👨‍💻 Tech Stack
-- **Backend Core**: C++23 
+- **Backend Core**: C++20 
 - **Web Server Core**: `yhirose/cpp-httplib`
 - **JSON Serialization**: `nlohmann/json`
 - **Frontend Dashboard**: HTML5, Vanilla Javascript, Vanilla CSS (Glassmorphism layout)

@@ -2,7 +2,7 @@
 #include <iostream>
 
 ThreadPool::ThreadPool(size_t num_threads, BlockingQueue<Task> &queue)
-    : queue_(queue), stop_(false) {
+    : queue_(queue) {
   for (size_t i = 0; i < num_threads; i++) {
     workers_.emplace_back(&ThreadPool::worker_loop, this);
   }
@@ -33,9 +33,6 @@ void ThreadPool::worker_loop() {
 }
 
 void ThreadPool::shutdown() {
-  // Signal stop
-  stop_ = true;
-
   // Shutdown queue -> wakes all waiting threads
   queue_.shutdown();
 
